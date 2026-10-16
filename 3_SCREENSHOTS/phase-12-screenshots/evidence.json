@@ -1,0 +1,101 @@
+{
+  "exposedApiKeys": [
+    "getAppInfo",
+    "getFarmerState",
+    "pickAccountsFile",
+    "startRun",
+    "stopRun",
+    "createEngineConfig",
+    "restartEngine",
+    "setTimer",
+    "onFarmerState",
+    "getAccountsState",
+    "addAccount",
+    "updateAccount",
+    "removeAccount",
+    "getEngineSettingsState",
+    "saveEngineSettings",
+    "resetEngineSettings",
+    "getSecretsState",
+    "setSecret",
+    "clearSecret",
+    "getLogsState",
+    "refreshLogs",
+    "exportLogs",
+    "runHealthChecks",
+    "getSettings",
+    "setThemeMode",
+    "setShutdownAfterRun"
+  ],
+  "heading": "Health",
+  "summary": "2 problems, 2 warnings, 4 could not be checked. 5 of 13 checks passed.",
+  "rows": [
+    {
+      "id": "app",
+      "status": "ok",
+      "text": "This app - OK | Checked 10:27:18 PM | Rewards Farmer LUCK 0.0.1 (Electron 44.7.0, linux)"
+    },
+    {
+      "id": "node",
+      "status": "ok",
+      "text": "Node.js (runs the engine) - OK | Checked 10:27:18 PM | Node.js 24.21.0"
+    },
+    {
+      "id": "git",
+      "status": "ok",
+      "text": "Git (downloads the engine) - OK | Checked 10:27:18 PM | Git 2.43.0"
+    },
+    {
+      "id": "engine-files",
+      "status": "ok",
+      "text": "Engine files - OK | Checked 10:27:18 PM | The engine folder and its API script are present."
+    },
+    {
+      "id": "engine-packages",
+      "status": "ok",
+      "text": "Engine packages - OK | Checked 10:27:18 PM | The engine packages are installed."
+    },
+    {
+      "id": "engine-built",
+      "status": "error",
+      "text": "Engine build - Problem | Checked 10:27:18 PM | The engine is not built yet. | What to do: Close this app and double-click START.bat in the project folder. It builds the engine on first run."
+    },
+    {
+      "id": "config-file",
+      "status": "error",
+      "text": "Engine config.json - Problem | Checked 10:27:18 PM | config.json does not exist yet. | What to do: Open the Home page and press \"Create config\". The engine starts from the example settings."
+    },
+    {
+      "id": "config-valid",
+      "status": "unknown",
+      "text": "config.json content - Unknown | Checked 10:27:18 PM | Not checked: config.json does not exist (see \"Engine config.json\")."
+    },
+    {
+      "id": "accounts-file",
+      "status": "warning",
+      "text": "Accounts file - Warning | Checked 10:27:18 PM | No accounts file is chosen yet. | What to do: Open the Home page and press \"Open\" to choose your accounts file."
+    },
+    {
+      "id": "engine-process",
+      "status": "warning",
+      "text": "Engine process - Warning | Checked 10:27:18 PM | The engine has not been started yet. It starts after an accounts file is chosen. | What to do: Open the Home page and choose your accounts file with \"Open\"."
+    },
+    {
+      "id": "engine-api",
+      "status": "unknown",
+      "text": "Engine API answers - Unknown | Checked 10:27:18 PM | Not checked: the engine is not running (see \"Engine process\")."
+    },
+    {
+      "id": "engine-config",
+      "status": "unknown",
+      "text": "Engine reads its config - Unknown | Checked 10:27:18 PM | Not checked: the engine is not running (see \"Engine process\")."
+    },
+    {
+      "id": "engine-version",
+      "status": "unknown",
+      "text": "Engine version - Unknown | Checked 10:27:18 PM | Not checked: the engine is not running (see \"Engine process\")."
+    }
+  ],
+  "rowCountAfterSecondOpen": 13,
+  "consoleProblems": []
+}

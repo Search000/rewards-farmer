@@ -1,0 +1,31 @@
+# Threat Model (Phase 3)
+
+## Assets
+Account passwords + TOTP secrets (`.env`), session cookies (`engine/sessions`), API token, webhook tokens (Telegram bot token, Discord URL), account emails, logs, `config.json`.
+
+## Trust boundaries
+Renderer (untrusted) | Main (trusted) | API child on loopback (semi-trusted, upstream code) | Bot child + browser visiting Microsoft/Bing pages (untrusted content) | Network.
+
+## Threats and mitigations
+| # | Threat | Mitigation | Residual |
+|---|---|---|---|
+| T1 | Other local user/process calls API | bind 127.0.0.1, random port, random token per launch, token in env not argv, constant-time compare (upstream) | same-user malware can read process env. out of scope, say so |
+| T2 | Website in user's browser hits `localhost` API (CSRF / DNS rebinding) | token required on every endpoint, CORS not `*`, random port | token theft = no mitigation |
+| T3 | Log content from remote pages injects script into UI | render logs as text only, strict CSP, no `innerHTML` | low |
+| T4 | Secrets leak in logs/reports/screenshots/Git | main-process redaction (passwords, tokens, keys, cookies, `Authorization`, bot token patterns), grep test in CI, `.gitignore` for `.env`, `sessions/`, `logs/`, builds | new secret formats may slip. regex review each phase. Phase 10: write-only secret fields (no value ever sent to the screen), exact values registered in the redactor before use, config.json and backups limited to the current user, Telegram bot tokens inside URLs masked |
+| T5 | Renderer compromise -> read `.env` | renderer never receives secrets; no fs/shell access; narrow IPC; password entered once, sent to main, cleared | low |
+| T6 | `.env` / config corruption or loss | backup before every write (timestamped), atomic write (temp + rename), confirm destructive actions | backup copy holds passwords. restrict folder ACL, tell user |
+| T7 | Malicious/broken upstream update | pinned commit, Phase 11 diff review + approval + tests + rollback, `npm ci` with lockfile, no auto-update | npm supply chain risk remains |
+| T8 | Orphan engine/browser processes after crash | PID file, taskkill tree on exit, startup orphan check | low |
+| T9 | Config write enabled widens API | flag on only for private token-protected instance; `reveal`, env override, schedule write stay off | accepted |
+| T10 | Path traversal / arbitrary file via account path or diagnostics route | validate chosen paths (must be a file named `.env`-like, user-selected via OS dialog), app never builds paths from renderer strings | low |
+| T11 | Electron misconfig (nodeIntegration, navigation, openExternal) | settings in architecture §8, allow-listed external URLs, update Electron on schedule | low |
+| T12 | Account restriction/ban | not technical-mitigable. About page notice. no evasion built | user risk, stated openly |
+| T13 | Webhook token exposed in `config.json` plaintext (upstream behavior) | mask in UI, redact in logs, warn user. `GET /config` redacted by default | stays plaintext on disk |
+| T14 | License violation on redistribution | ship GPL text, notices, source offer | lawyer check |
+| T15 | Diagnostics bundle (Phase 14) leaks a secret, an e-mail, an IP address, a cookie or the Windows user name to whoever receives the ZIP | the bundle never reads `.env`, sessions or secrets; every text is cleaned (known secret values + patterns + e-mail/IP/home-folder rules); `config.json` is copied only as numbers, true/false and short harmless text (secret fields show `<set>`); a SECOND independent check (`Scrubber.verify`) runs on the finished contents and, on any finding, NOTHING is saved (`EXPORT_BLOCKED`); `audit.log` is left out; only the last 1 MB / 2000 lines of each log are read; the renderer cannot choose a path or a file (IPC takes no argument); the file always ends in `.zip` so no app file can be overwritten; temp file + rename, removed on any failure | no program finds every possible secret: the README inside the bundle tells the user to look before sending. A secret in an unknown format that is not in the redactor and matches no pattern could pass |
+| T16 | Backup folder (Phase 18) holds a copy of `config.json` (webhook tokens) and of the accounts file (passwords, 2FA secrets); another Windows user, a sync tool or a half-written backup exposes or corrupts them | folder is created private (POSIX 700 / 600, Windows `icacls`) BEFORE the first secret byte is written; all files are written in a hidden `.tmp-` folder, flushed, read back and checksummed, the manifest is written last and ONE rename makes the folder a backup; the manifest has only names, sizes, checksums and an account COUNT (no value, no e-mail, no path); fixed file names (no path from the renderer or the source path); a failure removes the temporary folder and never leaves something that looks valid | the backup holds real secrets by design (a restore needs them): anyone who can read the user's Windows account can read it; it is NOT encrypted (Phase 19+ decision); a failed permission change is shown as a note, not a stop |
+| T17 | Backups page (Phase 19): the renderer asks main to inspect a backup or open a folder with a crafted name (path traversal), a backup damaged after writing is trusted for a restore, a failed backup leaves something that looks valid, messages leak a path or a value | no IPC method takes a path; `inspectBackup` accepts only the strict id format before any disk access and then looks only inside the fixed backup folder; `openFolder` takes no argument and opens only that folder; every backup is checked (manifest, id, presence, size, SHA-256) right after writing and on every list / inspect, a damaged one is shown as Damaged and a failed one is renamed to a hidden `.tmp-failed-` name (never deleted); texts hold file names, sizes and plain reasons only (tests plant FAKE secrets, e-mails and the folder path and find none in results, fixes, logs or the page) | the check proves a backup is unchanged since it was made, not that the source was right; a change made together with a matching manifest edit would pass; no encryption or signature (Phase 20+ decision); "Open backup folder" shows the folder to anyone at the PC |
+
+## Out of scope
+Defending against admin-level or same-user malware, Microsoft-side detection, network attackers on LAN (API loopback only).

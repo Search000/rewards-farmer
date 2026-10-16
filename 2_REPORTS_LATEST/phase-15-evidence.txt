@@ -1,0 +1,24 @@
+node on PATH = v24.21.0
+E1 node (real command): [ok] Node.js 24.21.0
+E2 network (real probe): [error] The name rewards.bing.com could not be looked up (ENOTFOUND). The computer looks offline, or DNS is blocked. || FIX: Check your Wi-Fi or network cable and that other websites open. If you use a VPN, turn it off or switch it. Then press "Re-run checks".
+E3a folder-data missing: [error] The app data folder does not exist: /tmp/ev-no-such-folder-1791977729711 || FIX: Close this app and open it again with START.bat. It creates the folder. If this stays, check that the drive is connected.
+E3b folder-data after creating the folder: [ok] The app data folder can be read and written: /tmp/ev-no-such-folder-1791977729711
+E3c folder-data where a FILE is in the way: [error] The app data folder does not exist: /tmp/ev-a-file-1791977729734 || FIX: Close this app and open it again with START.bat. It creates the folder. If this stays, check that the drive is connected.
+E4a engine-packages before install: [error] The engine packages are not installed (or the install did not finish). || FIX: Close this app and double-click START.bat in the project folder. It installs the engine packages (needs internet, takes a few minutes).
+E4b engine-built before build: [error] The engine is not built yet. || FIX: Close this app and double-click START.bat in the project folder. It builds the engine on first run.
+   (ran: npm ci --replace-registry-host=always --ignore-scripts in a temp copy, 4296 ms)
+E4c engine-packages after install: [ok] The engine packages are installed.
+   (ran: npm run build in the same temp copy, 7563 ms)
+E4d engine-built after build: [ok] The engine is built.
+E5a config-file missing: [error] config.json does not exist yet. || FIX: Open the Home page and press "Create config". The engine starts from the example settings.
+E5b config-valid broken file: [error] config.json is not valid JSON. || FIX: Open the engine folder (the folder named "engine" inside the project folder) in File Explorer and rename config.json to config.broken.json. That keeps your copy. Then open the Home page and press "Create config". Settings you changed before must be entered again; open config.broken.json in Notepad to read them.
+E6a engine-files (engine folder missing): [error] The engine folder is missing or incomplete. || FIX: Close this app and double-click START.bat in the project folder. It offers to download the engine files (needs Git and internet).
+   git submodule status BEFORE: -e0c15a6ae6bd102cb04f2a3351e2fa281f82961c engine
+   git submodule status AFTER : e0c15a6ae6bd102cb04f2a3351e2fa281f82961c engine (v4.3.2.3-11-ge0c15a6)
+E6b engine-files after git submodule update --init: [ok] The engine folder and its API script are present.
+
+E7 real Node row, same machine, before/after switching PATH to Node 24:
+PATH node = v22.22.2
+[error] Node.js 22.22.2 is too old. The engine needs 24 or newer. || FIX: Download Node.js 24 or newer from https://nodejs.org/ , install it, then close this app and double-click START.bat again.
+PATH node = v24.21.0
+[ok] Node.js 24.21.0

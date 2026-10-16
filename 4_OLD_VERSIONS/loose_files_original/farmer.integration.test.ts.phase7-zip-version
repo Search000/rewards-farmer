@@ -1,0 +1,503 @@
+// @vitest-environment node
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it } from 'vitest'
+import { isProcessAlive } from '../../src/main/engine/supervisor'
+import { FAKE_PASSWORD, FAKE_TOTP, makeFixture, makeHarness, readLog, waitFor } from './helpers'
+import type { Harness } from './helpers'
+
+// Integration tests against the REAL engine control API (engine/scripts/api/server.js, copied unmodified into a
+// temp dir). Only the bot entry is a fixture (tests/fixtures/fake-bot.cjs). All accounts here are fake and
+// exist only inside the temp dir (rule 18).
+
+const harnesses: Harness[] = []
+async function setup(options: Parameters<typeof makeHarness>[0] = {}): Promise<Harness> {
+    const h = makeHarness(options)
+    harnesses.push(h)
+    return h
+}
+afterEach(async () => {
+    while (harnesses.length > 0) await harnesses.pop()?.cleanup()
+})
+
+const phase = (h: Harness) => h.farmer.getState().run.phase
+const link = (h: Harness) => h.farmer.getState().engine.link
+
+describe('Home: setup problems are honest and block Start', () => {
+    it('no accounts file chosen: Start disabled with a reason, engine not started, startRun refuses', async () => {
+        const h = await setup()
+        await h.farmer.init()
+        const s = h.farmer.getState()
+        expect(s.accounts.status).toBe('not-set')
+        expect(s.startDisabledReason).toMatch(/Choose an accounts file/)
+        expect(s.engine.link).toBe('not-started')
+        expect(await h.farmer.startRun()).toMatchObject({ ok: false, code: 'ACCOUNTS_NOT_SET' })
+        expect(s.current.account).toBeNull()
+        expect(s.summary).toEqual({ all: null, finished: null, failed: null })
+    })
+
+    it('path errors: missing file, directory, wrong name, no accounts. State stays unchanged, nothing saved', async () => {
+        const h = await setup()
+        await h.farmer.init()
+        const bads: [string, string][] = []
+        const dir = join(h.fx.dir, 'folder.env')
+        writeFileSync(join(h.fx.dir, 'notes.txt'), 'ACCOUNT_1_EMAIL=a@x.com')
+        writeFileSync(join(h.fx.dir, 'noacc.env'), 'FOO=bar\n')
+        bads.push(
+            [join(h.fx.dir, 'gone.env'), 'does not exist'],
+            [h.fx.dir, 'file name'],
+            [join(h.fx.dir, 'notes.txt'), 'file name'],
+            [join(h.fx.dir, 'noacc.env'), 'No account found']
+        )
+        void dir
+        for (const [path, text] of bads) {
+            h.picked = path
+            const res = await h.farmer.pickAccounts()
+            expect(res.cancelled).toBe(false)
+            expect(res.result).toMatchObject({ ok: false, code: 'ACCOUNTS_INVALID' })
+            expect(res.result.message).toContain(text)
+        }
+        expect(h.farmer.getState().accounts.status).toBe('not-set')
+        expect(h.settings.value.accountsPath).toBeNull()
+        expect(link(h)).toBe('not-started')
+    })
+
+    it('cancelling the file dialog changes nothing', async () => {
+        const h = await setup()
+        await h.farmer.init()
+        h.picked = null
+        expect(await h.farmer.pickAccounts()).toMatchObject({ cancelled: true })
+        expect(h.farmer.getState().accounts.status).toBe('not-set')
+    })
+
+    it('a saved accounts path that no longer exists shows an error at startup (not a crash)', async () => {
+        const h = await setup()
+        await h.settings.update({ accountsPath: join(h.fx.dir, 'moved-away.env') })
+        await h.farmer.init()
+        const s = h.farmer.getState()
+        expect(s.accounts.status).toBe('error')
+        expect(s.startDisabledReason).toMatch(/Accounts file problem: .*does not exist/)
+        expect(s.notices.some((n) => n.id === 'accounts' && n.severity === 'error')).toBe(true)
+    })
+
+    it('missing engine config.json: Start blocked, createConfig fixes it, and never overwrites an existing file', async () => {
+        const h = await setup({ config: false })
+        await h.farmer.init()
+        await h.farmer.pickAccounts()
+        expect(h.farmer.getState().startDisabledReason).toMatch(/config\.json is missing/)
+        expect(await h.farmer.startRun()).toMatchObject({ ok: false, code: 'CONFIG_MISSING' })
+        expect(h.farmer.getState().notices.find((n) => n.id === 'config-missing')?.action).toBe(
+            'create-config'
+        )
+
+        expect(await h.farmer.createConfig()).toMatchObject({ ok: true })
+        expect(existsSync(join(h.fx.engineRoot, 'config.json'))).toBe(true)
+        expect(h.farmer.getState().startDisabledReason).toBeNull()
+
+        writeFileSync(join(h.fx.engineRoot, 'config.json'), '{"mine":true}')
+        expect(await h.farmer.createConfig()).toMatchObject({ ok: false })
+        expect(readFileSync(join(h.fx.engineRoot, 'config.json'), 'utf8')).toBe('{"mine":true}')
+    })
+
+    it('engine not built: Start blocked with the exact commands to run', async () => {
+        const h = await setup({ built: false })
+        await h.farmer.init()
+        await h.farmer.pickAccounts()
+        expect(h.farmer.getState().startDisabledReason).toMatch(/npm run engine:build/)
+        expect(await h.farmer.startRun()).toMatchObject({ ok: false, code: 'ENGINE_NOT_BUILT' })
+    })
+
+    it('engine folder missing: clear error, no spawn', async () => {
+        const h = await setup()
+        rmSync(join(h.fx.engineRoot, 'scripts'), { recursive: true })
+        await h.farmer.init()
+        h.picked = h.fx.accountsFile
+        const res = await h.farmer.pickAccounts()
+        expect(res.result).toMatchObject({ ok: false, code: 'ENGINE_MISSING' })
+        expect(h.farmer.getState().notices.some((n) => n.id === 'engine-missing')).toBe(true)
+    })
+
+    it('Node.js not found: honest NODE_MISSING instead of a hang', async () => {
+        const h = await setup()
+        const bad = await h.supervisor.start({}) // sanity: the harness node works
+        expect(bad.ok).toBe(true)
+        await h.supervisor.stop()
+        const { EngineSupervisor } = await import('../../src/main/engine/supervisor')
+        const sup = new EngineSupervisor({
+            engineRoot: h.fx.engineRoot,
+            nodeCommand: 'no-such-node-binary',
+            redact: (t) => t,
+            log: () => undefined
+        })
+        expect(await sup.start({})).toMatchObject({ ok: false, code: 'NODE_MISSING' })
+        expect(sup.snapshot().link).toBe('failed')
+    })
+})
+
+describe('Home: real engine lifecycle (Start, Stop, restart, duplicate start)', () => {
+    it('chosen accounts file feeds the engine: real /accounts count, proxy summary without credentials, unrelated vars not forwarded', async () => {
+        const h = await setup()
+        await h.farmer.init()
+        const res = await h.farmer.pickAccounts()
+        expect(res.result.ok).toBe(true)
+        expect(link(h)).toBe('ready')
+        const s = h.farmer.getState()
+        expect(s.accounts).toMatchObject({ status: 'ok', count: 2 })
+        expect(s.summary.all).toBe(2)
+        expect(s.engine.version).toMatch(/^\d+\.\d+/)
+        expect(s.startDisabledReason).toBeNull()
+        expect(h.settings.value.accountsPath).toBe(h.fx.accountsFile)
+        // talk to the real API directly to verify what the engine received
+        const api = h.supervisor.api
+        expect(api).not.toBeNull()
+        const acc = JSON.stringify(await api?.accounts())
+        expect(acc).toContain('proxy.example.com')
+        expect(acc).not.toContain('proxyuser-test')
+        expect(acc).not.toContain('proxypass-test-only')
+        expect(acc).not.toContain(FAKE_PASSWORD)
+    })
+
+    it('Start -> running with real numbers -> Stop -> idle; then Start again (restart) works; duplicate start is refused', async () => {
+        const h = await setup()
+        await h.farmer.init()
+        await h.farmer.pickAccounts()
+
+        // two clicks at once: exactly one wins
+        const [a, b] = await Promise.all([h.farmer.startRun(), h.farmer.startRun()])
+        expect([a.ok, b.ok].filter(Boolean)).toHaveLength(1)
+        const loser = a.ok ? b : a
+        expect(loser.code).toBe('RUN_ACTIVE')
+
+        const running = await waitFor(
+            () => h.farmer.getState(),
+            (s) => s.run.phase === 'running' && s.current.points !== null && s.current.points > 1000,
+            'running with points'
+        )
+        expect(running.current.account).toBe('alpha@example.com') // came from the ACCOUNT_1_EMAIL in the chosen file
+        // Points and the newest log line are read from two engine routes a moment apart, so either of the two bot lines can be newest.
+        expect(['SEARCH-BING', 'FLOW']).toContain(running.current.section)
+        expect(running.current.detail).toMatch(/余额=/)
+        expect(running.current.proxy).toBeNull() // alpha has no proxy: "-" in the UI, never invented
+        expect(running.run.startedAt).not.toBeNull()
+        expect(running.startDisabledReason).toMatch(/already (starting|running)/)
+        expect(running.stopDisabledReason).toBeNull()
+        // third attempt while running
+        expect(await h.farmer.startRun()).toMatchObject({ ok: false, code: 'RUN_ACTIVE' })
+
+        const firstStartedAt = running.run.startedAt
+        expect((await h.farmer.stopRun()).ok).toBe(true)
+        const stopped = await waitFor(
+            () => h.farmer.getState(),
+            (s) => s.run.phase === 'idle',
+            'idle after stop'
+        )
+        expect(stopped.notices.find((n) => n.id === 'run')?.message).toBe('Run stopped.')
+        expect(stopped.stopDisabledReason).toBe('No run in progress.')
+        expect(stopped.current.account).toBeNull()
+        expect(await h.farmer.stopRun()).toMatchObject({ ok: false, code: 'NOT_RUNNING' })
+
+        // restart = start again after stop
+        expect((await h.farmer.startRun()).ok).toBe(true)
+        const again = await waitFor(
+            () => h.farmer.getState(),
+            (s) => s.run.phase === 'running',
+            'running again'
+        )
+        expect(again.run.startedAt).not.toBe(firstStartedAt)
+        expect(again.notices.find((n) => n.id === 'run')).toBeUndefined() // old notice cleared by the new run
+        await h.farmer.stopRun()
+        await waitFor(
+            () => phase(h),
+            (p) => p === 'idle',
+            'idle'
+        )
+    })
+
+    it("a run that finishes by itself is reported as finished, with the engine's own per-account result", async () => {
+        const h = await setup({ botMode: 'finish' })
+        await h.farmer.init()
+        await h.farmer.pickAccounts()
+        await h.farmer.startRun()
+        const s = await waitFor(
+            () => h.farmer.getState(),
+            (x) => x.notices.some((n) => n.message === 'Run finished.'),
+            'run finished'
+        )
+        expect(s.run.phase).toBe('idle')
+        expect(s.run.lastExit?.code).toBe(0)
+        expect(s.summary.finished).toBe(1)
+        expect(s.summary.failed).toBe(0)
+    })
+
+    it("unexpected bot exit (non-zero code) is shown as an error with the engine's last error line", async () => {
+        const h = await setup({ botMode: 'fail' })
+        await h.farmer.init()
+        await h.farmer.pickAccounts()
+        await h.farmer.startRun()
+        const s = await waitFor(
+            () => h.farmer.getState(),
+            (x) => x.notices.some((n) => n.id === 'run' && n.severity === 'error'),
+            'unexpected exit notice'
+        )
+        const notice = s.notices.find((n) => n.id === 'run')
+        expect(notice?.message).toMatch(/ended unexpectedly \(exit code 3\)/)
+        expect(notice?.message).toMatch(/simulated test failure/)
+        expect(s.run.phase).toBe('idle')
+        expect(s.startDisabledReason).toBeNull() // user can try again
+        await h.audit.flush()
+        expect(readLog(h, 'audit.log')).toMatch(/"action":"run-ended","result":"unexpected-exit"/)
+    })
+
+    it('start failure: the engine cannot launch the bot process at all', async () => {
+        const h = await setup({ botCommand: join('definitely', 'not', 'an', 'executable') })
+        await h.farmer.init()
+        await h.farmer.pickAccounts()
+        const res = await h.farmer.startRun()
+        expect(res.ok).toBe(true) // the API accepted (202); the failure appears when the process cannot spawn
+        const s = await waitFor(
+            () => h.farmer.getState(),
+            (x) => x.notices.some((n) => n.id === 'run' && n.severity === 'error'),
+            'spawn failure shown'
+        )
+        expect(s.notices.find((n) => n.id === 'run')?.message).toMatch(/ended unexpectedly/)
+        expect(s.run.phase).toBe('idle')
+    })
+})
+
+describe('Home: engine process failures', () => {
+    it('engine API killed while idle: automatic restart brings it back, and it is visible in between', async () => {
+        const h = await setup()
+        await h.farmer.init()
+        await h.farmer.pickAccounts()
+        const pid = h.supervisor.snapshot().pid
+        expect(pid).not.toBeNull()
+        process.kill(pid as number, 'SIGKILL')
+        await waitFor(
+            () => link(h),
+            (l) => l !== 'ready',
+            'link leaves ready'
+        )
+        expect(h.farmer.getState().startDisabledReason).not.toBeNull()
+        await waitFor(
+            () => link(h),
+            (l) => l === 'ready',
+            'engine restarted'
+        )
+        expect(h.supervisor.snapshot().pid).not.toBe(pid)
+        await waitFor(
+            () => phase(h),
+            (p) => p === 'idle',
+            'idle after restart'
+        )
+        expect(h.farmer.getState().startDisabledReason).toBeNull()
+    })
+
+    it('engine API killed DURING a run: the bot is not left orphaned, the run is marked incomplete', async () => {
+        const h = await setup()
+        await h.farmer.init()
+        await h.farmer.pickAccounts()
+        await h.farmer.startRun()
+        await waitFor(
+            () => h.farmer.getState(),
+            (s) => s.run.phase === 'running' && s.current.points !== null,
+            'running'
+        )
+        // the bot pid as the engine reports it (real /status), before we kill the API
+        const status = await h.supervisor.api?.status()
+        const botPid = status?.pid as number
+        expect(isProcessAlive(botPid)).toBe(true)
+        process.kill(h.supervisor.snapshot().pid as number, 'SIGKILL')
+        const s = await waitFor(
+            () => h.farmer.getState(),
+            (x) =>
+                x.notices.some(
+                    (n) => n.id === 'run' && /crashed during a run|stopped during a run/.test(n.message)
+                ),
+            'crash notice'
+        )
+        expect(s.notices.find((n) => n.id === 'run')?.severity).toBe('error')
+        await waitFor(
+            () => isProcessAlive(botPid),
+            (alive) => !alive,
+            'bot process gone'
+        )
+        await waitFor(
+            () => link(h),
+            (l) => l === 'ready',
+            'engine back'
+        )
+    })
+
+    it('after the maximum number of automatic restarts the engine is reported as failed, with a Restart action', async () => {
+        const h = await setup({ maxAutoRestarts: 0 })
+        await h.farmer.init()
+        await h.farmer.pickAccounts()
+        process.kill(h.supervisor.snapshot().pid as number, 'SIGKILL')
+        await waitFor(
+            () => link(h),
+            (l) => l === 'failed',
+            'failed state'
+        )
+        const n = h.farmer.getState().notices.find((x) => x.id === 'engine-link')
+        expect(n?.action).toBe('restart-engine')
+        expect((await h.farmer.restartEngine()).ok).toBe(true)
+        expect(link(h)).toBe('ready')
+    })
+
+    it('Stop and engine restart are refused while a run is active', async () => {
+        const h = await setup()
+        await h.farmer.init()
+        await h.farmer.pickAccounts()
+        await h.farmer.startRun()
+        await waitFor(
+            () => phase(h),
+            (p) => p === 'running',
+            'running'
+        )
+        expect(await h.farmer.restartEngine()).toMatchObject({ ok: false, code: 'RUN_ACTIVE' })
+        h.picked = h.fx.accountsFile
+        expect((await h.farmer.pickAccounts()).result).toMatchObject({ ok: false, code: 'RUN_ACTIVE' })
+    })
+
+    it('quitting the app stops the engine API and the bot', async () => {
+        const h = await setup()
+        await h.farmer.init()
+        await h.farmer.pickAccounts()
+        await h.farmer.startRun()
+        await waitFor(
+            () => phase(h),
+            (p) => p === 'running',
+            'running'
+        )
+        const apiPid = h.supervisor.snapshot().pid as number
+        const botPid = (await h.supervisor.api?.status())?.pid as number
+        await h.farmer.dispose()
+        expect(isProcessAlive(apiPid)).toBe(false)
+        await waitFor(
+            () => isProcessAlive(botPid),
+            (alive) => !alive,
+            'bot gone after quit'
+        )
+    })
+})
+
+describe('Home: timer (app-side)', () => {
+    it('saves the timer, rejects bad times, and persists across a new service instance', async () => {
+        const h = await setup()
+        await h.farmer.init()
+        expect(await h.farmer.setTimer(true, '25:61')).toMatchObject({ ok: false, code: 'INVALID_TIME' })
+        expect((await h.farmer.setTimer(true, '07:30')).ok).toBe(true)
+        expect(h.farmer.getState().timer).toMatchObject({ enabled: true, time: '07:30' })
+        expect(h.farmer.getState().timer.nextFireAt).not.toBeNull()
+        const raw = JSON.parse(readFileSync(join(h.fx.userData, 'app-settings.json'), 'utf8')) as Record<
+            string,
+            unknown
+        >
+        expect(raw).toMatchObject({ timerEnabled: true, timerTime: '07:30' })
+        await h.farmer.setTimer(false, '07:30')
+        expect(h.farmer.getState().timer).toMatchObject({ enabled: false, nextFireAt: null })
+    })
+
+    it('when the time arrives the timer starts a REAL run through the engine, and audits it', async () => {
+        const start = new Date(2026, 9, 11, 10, 0, 0).getTime()
+        const h = await setup({ startTime: start })
+        await h.farmer.init()
+        await h.farmer.pickAccounts()
+        await h.farmer.setTimer(true, '10:01')
+        h.clock.now = start + 61_000
+        await waitFor(
+            () => phase(h),
+            (p) => p === 'running' || p === 'starting',
+            'timer started a run'
+        )
+        await h.audit.flush()
+        expect(readLog(h, 'audit.log')).toMatch(/"action":"timer-fire"/)
+        expect(readLog(h, 'audit.log')).toMatch(/Run requested \(timer\)/)
+    })
+
+    it('a timer that cannot start (setup problem) is reported, not hidden', async () => {
+        const start = new Date(2026, 9, 11, 10, 0, 0).getTime()
+        const h = await setup({ startTime: start })
+        await h.farmer.init() // no accounts file chosen
+        await h.farmer.setTimer(true, '10:01')
+        h.clock.now = start + 61_000
+        const s = await waitFor(
+            () => h.farmer.getState(),
+            (x) => x.notices.some((n) => n.id === 'timer'),
+            'timer notice'
+        )
+        expect(s.notices.find((n) => n.id === 'timer')?.message).toMatch(
+            /could not start a run: Choose an accounts file/
+        )
+    })
+
+    it('a missed timer (PC asleep) is reported and NOT started late', async () => {
+        const start = new Date(2026, 9, 11, 10, 0, 0).getTime()
+        const h = await setup({ startTime: start })
+        await h.farmer.init()
+        await h.farmer.pickAccounts()
+        await h.farmer.setTimer(true, '10:05')
+        h.clock.now = start + 3 * 3600_000
+        const s = await waitFor(
+            () => h.farmer.getState(),
+            (x) => x.notices.some((n) => n.id === 'timer'),
+            'missed notice'
+        )
+        expect(s.notices.find((n) => n.id === 'timer')?.message).toMatch(/No run was started/)
+        expect(s.run.phase).toBe('idle')
+    })
+})
+
+describe('Home: secrets never reach logs or the renderer state', () => {
+    it('passwords, TOTP, proxy credentials and the API token are absent from logs and from FarmerState', async () => {
+        const h = await setup({ botMode: 'fail' })
+        await h.farmer.init()
+        await h.farmer.pickAccounts()
+        await h.farmer.startRun()
+        await waitFor(
+            () => h.farmer.getState(),
+            (x) => x.notices.some((n) => n.id === 'run' && n.severity === 'error'),
+            'run ended'
+        )
+        await h.farmer.setTimer(true, '03:15')
+        await Promise.all([h.audit.flush(), h.appLog.flush()])
+        const everything = `${readLog(h, 'app.log')}\n${readLog(h, 'audit.log')}\n${JSON.stringify(h.farmer.getState())}`
+        for (const secret of [FAKE_PASSWORD, FAKE_TOTP, 'proxyuser-test', 'proxypass-test-only'])
+            expect(everything, `leaked ${secret}`).not.toContain(secret)
+        expect(everything).not.toMatch(/[0-9a-f]{64}/) // the per-launch API token
+        expect(everything).not.toMatch(/Bearer\s+[A-Za-z0-9]/)
+        expect(readLog(h, 'audit.log').length).toBeGreaterThan(0) // and the logs really have content
+        expect(readLog(h, 'app.log')).toContain('Engine API: ready')
+    })
+
+    it('audit lines carry action, result and a correlation id; emails appear in full', async () => {
+        const h = await setup()
+        await h.farmer.init()
+        await h.farmer.pickAccounts()
+        await h.farmer.startRun()
+        await waitFor(
+            () => phase(h),
+            (p) => p === 'running',
+            'running'
+        )
+        await h.farmer.stopRun()
+        await h.audit.flush()
+        const lines = readLog(h, 'audit.log')
+            .trim()
+            .split('\n')
+            .map((l) => JSON.parse(l) as Record<string, string>)
+        const start = lines.find((l) => l['action'] === 'start')
+        expect(start).toMatchObject({ source: 'audit', level: 'info', result: 'ok' })
+        expect(start?.['corrId']).toMatch(/^[0-9a-f-]{36}$/)
+        expect(lines.some((l) => l['action'] === 'stop' && l['result'] === 'ok')).toBe(true)
+    })
+})
+
+describe('fixtures never leak into the real project', () => {
+    it('the real engine folder has no config.json / dist / .env created by tests', () => {
+        const root = join(__dirname, '..', '..', 'engine')
+        expect(existsSync(join(root, 'config.json'))).toBe(false)
+        expect(existsSync(join(root, '.env'))).toBe(false)
+        void makeFixture
+    })
+})
