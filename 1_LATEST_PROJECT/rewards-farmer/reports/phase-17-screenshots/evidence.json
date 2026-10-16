@@ -1,0 +1,11 @@
+{
+  "summary": null,
+  "pageProblem": "config.json is missing\n\nconfig.json is missing. Use \"Create config\" on Home first.\n\nCheck again",
+  "cards": [],
+  "unsupported": [
+    "notify-unsupported-serverchan",
+    "notify-unsupported-clawbot"
+  ],
+  "logFilterNote": null,
+  "consoleProblems": []
+}

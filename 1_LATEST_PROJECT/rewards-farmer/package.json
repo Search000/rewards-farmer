@@ -1,0 +1,56 @@
+{
+    "name": "rewards-farmer-desktop",
+    "version": "0.0.1",
+    "private": true,
+    "description": "Windows desktop shell for the Microsoft Rewards Script control API. Phase 5: shell and design system only.",
+    "license": "GPL-3.0-or-later",
+    "engines": {
+        "node": ">=24.0.0"
+    },
+    "scripts": {
+        "dev:renderer": "vite",
+        "build:renderer": "vite build",
+        "build:main": "node scripts/build-main.mjs",
+        "build": "npm run build:renderer && npm run build:main",
+        "start": "npm run build && electron .",
+        "typecheck": "tsc --noEmit",
+        "lint": "eslint .",
+        "format": "prettier --write .",
+        "format:check": "prettier --check .",
+        "test": "vitest run",
+        "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
+        "engine:install": "npm --prefix engine ci --replace-registry-host=always",
+        "engine:build": "npm --prefix engine run build",
+        "engine:test": "npm --prefix engine run test:log-parser",
+        "engine:browser": "npm --prefix engine run install:browser"
+    },
+    "devDependencies": {
+        "@eslint/js": "10.0.1",
+        "@testing-library/jest-dom": "7.0.1",
+        "@testing-library/react": "16.3.3",
+        "@testing-library/user-event": "14.6.7",
+        "@types/node": "24.19.2",
+        "@types/react": "19.3.0",
+        "@types/react-dom": "19.3.0",
+        "@vitejs/plugin-react": "6.1.2",
+        "electron": "44.7.0",
+        "esbuild": "0.28.2",
+        "eslint": "10.12.0",
+        "jsdom": "30.1.2",
+        "prettier": "3.9.10",
+        "typescript": "6.0.3",
+        "typescript-eslint": "8.71.1",
+        "vite": "8.3.4",
+        "vitest": "5.0.3"
+    },
+    "dependencies": {
+        "@emotion/react": "11.14.0",
+        "@emotion/styled": "11.14.1",
+        "@fontsource/roboto": "5.3.0",
+        "@mui/icons-material": "9.5.0",
+        "@mui/material": "9.5.0",
+        "react": "19.3.0",
+        "react-dom": "19.3.0"
+    },
+    "main": "dist/main/main.js"
+}

@@ -1,0 +1,103 @@
+{
+  "firstRun": [
+    {
+      "id": "app",
+      "status": "ok",
+      "text": "This app - OK | Checked 10:01:36 AM | Rewards Farmer LUCK 0.0.1 (Electron 44.7.0, linux)"
+    },
+    {
+      "id": "node",
+      "status": "ok",
+      "text": "Node.js (runs the engine) - OK | Checked 10:01:36 AM | Node.js 24.21.0"
+    },
+    {
+      "id": "git",
+      "status": "ok",
+      "text": "Git (downloads the engine) - OK | Checked 10:01:36 AM | Git 2.43.0"
+    },
+    {
+      "id": "engine-files",
+      "status": "ok",
+      "text": "Engine files - OK | Checked 10:01:36 AM | The engine folder and its API script are present."
+    },
+    {
+      "id": "engine-packages",
+      "status": "ok",
+      "text": "Engine packages - OK | Checked 10:01:36 AM | The engine packages are installed."
+    },
+    {
+      "id": "engine-built",
+      "status": "error",
+      "text": "Engine build - Problem | Checked 10:01:36 AM | The engine is not built yet. | What to do: Close this app and double-click START.bat in the project folder. It builds the engine on first run."
+    },
+    {
+      "id": "config-file",
+      "status": "error",
+      "text": "Engine config.json - Problem | Checked 10:01:36 AM | config.json does not exist yet. | What to do: Open the Home page and press \"Create config\". The engine starts from the example settings."
+    },
+    {
+      "id": "config-valid",
+      "status": "unknown",
+      "text": "config.json content - Unknown | Checked 10:01:36 AM | Not checked: config.json does not exist (see \"Engine config.json\")."
+    },
+    {
+      "id": "accounts-file",
+      "status": "warning",
+      "text": "Accounts file - Warning | Checked 10:01:36 AM | No accounts file is chosen yet. | What to do: Open the Home page and press \"Open\" to choose your accounts file."
+    },
+    {
+      "id": "engine-process",
+      "status": "warning",
+      "text": "Engine process - Warning | Checked 10:01:36 AM | The engine has not been started yet. It starts after an accounts file is chosen. | What to do: Open the Home page and choose your accounts file with \"Open\"."
+    },
+    {
+      "id": "engine-api",
+      "status": "unknown",
+      "text": "Engine API answers - Unknown | Checked 10:01:36 AM | Not checked: the engine is not running (see \"Engine process\")."
+    },
+    {
+      "id": "engine-config",
+      "status": "unknown",
+      "text": "Engine reads its config - Unknown | Checked 10:01:36 AM | Not checked: the engine is not running (see \"Engine process\")."
+    },
+    {
+      "id": "engine-version",
+      "status": "unknown",
+      "text": "Engine version - Unknown | Checked 10:01:36 AM | Not checked: the engine is not running (see \"Engine process\")."
+    },
+    {
+      "id": "disk-space",
+      "status": "ok",
+      "text": "Free disk space - OK | Checked 10:01:36 AM | Free space: 8.7 GB on the app data drive, 8.7 GB on the engine drive."
+    },
+    {
+      "id": "folder-data",
+      "status": "ok",
+      "text": "App data folder (read and write) - OK | Checked 10:01:36 AM | The app data folder can be read and written: /root/.config/Rewards Farmer LUCK"
+    },
+    {
+      "id": "folder-engine",
+      "status": "ok",
+      "text": "Engine folder (read and write) - OK | Checked 10:01:36 AM | The engine folder can be read and written: /home/claude/rewards-farmer-MASTER/1_LATEST_PROJECT/rewards-farmer/engine"
+    },
+    {
+      "id": "network",
+      "status": "error",
+      "text": "Internet connection - Problem | Checked 10:01:36 AM | The name rewards.bing.com could not be looked up (ENOTFOUND). The computer looks offline, or DNS is blocked. | What to do: Check your Wi-Fi or network cable and that other websites open. If you use a VPN, turn it off or switch it. Then press \"Re-run checks\"."
+    }
+  ],
+  "firstSummary": "3 problems, 2 warnings, 4 could not be checked. 8 of 17 checks passed.",
+  "buttonBefore": {
+    "text": "Re-run checks",
+    "disabled": false
+  },
+  "buttonWhileRunning": {
+    "text": "Re-run checks",
+    "disabled": false
+  },
+  "timeBefore": "This app - OK | Checked 10:01:36 AM | Rewards Farmer LUCK 0.0.1 (Electron 44.7.0, linux)",
+  "timeAfter": "This app - OK | Checked 10:01:42 AM | Rewards Farmer LUCK 0.0.1 (Electron 44.7.0, linux)",
+  "rerunChangedTimestamp": true,
+  "footer": "17 checks, last run at 10:01:42 AM. Press \"Re-run checks\" to run them again. While this page is open they also run again by themselves when the engine or the accounts file changes, when the internet goes off or on, or when you come back to this window.",
+  "consoleProblems": []
+}

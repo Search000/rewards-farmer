@@ -1,0 +1,254 @@
+import AddIcon from '@mui/icons-material/Add'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
+import Alert from '@mui/material/Alert'
+import Box from '@mui/material/Box'
+import Chip from '@mui/material/Chip'
+import Divider from '@mui/material/Divider'
+import Fab from '@mui/material/Fab'
+import IconButton from '@mui/material/IconButton'
+import List from '@mui/material/List'
+import ListItem from '@mui/material/ListItem'
+import ListItemText from '@mui/material/ListItemText'
+import Typography from '@mui/material/Typography'
+import { Fragment, useState } from 'react'
+import type { AccountInput, AccountView } from '../../shared/accounts-types'
+import type { ActionResult } from '../../shared/farmer-types'
+import { AccountDialog } from '../components/AccountDialog'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+import { DisabledReason } from '../components/DisabledReason'
+import { useNotify } from '../components/Notifications'
+import { PageCard } from '../components/PageCard'
+import { StateBlock } from '../components/StateBlock'
+import type { FarmerStateHook } from '../hooks/useFarmerState'
+import { useAccountsState } from '../hooks/useAccountsState'
+
+// Text of screenshot 2 (empty state).
+export const NO_FILE_TEXT = 'No accounts file added yet, open an accounts file from Home'
+
+type DialogState = { readonly mode: 'add' } | { readonly mode: 'edit'; readonly account: AccountView }
+
+function chips(a: AccountView): string[] {
+    const out = [
+        a.hasPassword ? 'Password saved' : 'No password',
+        a.hasTotp ? '2FA secret saved' : 'No 2FA secret',
+        a.hasRecoveryEmail ? 'Recovery e-mail saved' : 'No recovery e-mail',
+        `Language: ${a.langCode ?? 'default'}`,
+        `Region: ${a.geoLocale ?? 'default'}`
+    ]
+    if (a.proxy === null) out.push('No proxy')
+    else {
+        out.push(`Proxy: ${a.proxy.url}${a.proxy.port === null ? '' : `:${String(a.proxy.port)}`}`)
+        if (a.proxy.hasCredentials) out.push('Proxy login saved')
+    }
+    return out
+}
+
+export function AccountsPage({ farmer }: { readonly farmer: FarmerStateHook }) {
+    const { state, bridgeMissing, error, api, reload } = useAccountsState(farmer)
+    const notify = useNotify()
+    const [dialog, setDialog] = useState<DialogState | null>(null)
+    const [removing, setRemoving] = useState<AccountView | null>(null)
+    const [busy, setBusy] = useState(false)
+
+    if (bridgeMissing) {
+        return (
+            <PageCard title="Accounts">
+                <StateBlock
+                    state="unavailable"
+                    message="This page is not running inside the desktop app."
+                    detail="There is no accounts file to read here. Open this app by double-clicking START.bat in the project folder."
+                />
+            </PageCard>
+        )
+    }
+    if (error !== null && state === null) {
+        return (
+            <PageCard title="Accounts">
+                <StateBlock
+                    state="error"
+                    message="Could not read the accounts."
+                    detail={error}
+                    onRetry={reload}
+                />
+            </PageCard>
+        )
+    }
+    if (state === null || api === null) {
+        return (
+            <PageCard title="Accounts">
+                <StateBlock state="loading" message="Reading the accounts file..." />
+            </PageCard>
+        )
+    }
+
+    // One change at a time. The main process also serializes them and refuses edits during a run.
+    const run = async (fn: () => Promise<ActionResult>): Promise<ActionResult> => {
+        setBusy(true)
+        try {
+            const result = await fn()
+            if (result.ok) notify.notify(result.message, 'success')
+            reload()
+            return result
+        } catch (e: unknown) {
+            return { ok: false, message: e instanceof Error ? e.message : 'The change failed.' }
+        } finally {
+            setBusy(false)
+        }
+    }
+
+    const confirmRemove = async (): Promise<void> => {
+        const target = removing
+        setRemoving(null)
+        if (target === null) return
+        const result = await run(() => api.removeAccount(target.slot, target.email))
+        if (!result.ok) notify.notify(result.message, 'error')
+    }
+
+    const editReason = busy ? 'Working...' : (state.editDisabledReason ?? undefined)
+    const addReason =
+        state.status === 'not-set'
+            ? 'Open an accounts file from Home first.'
+            : state.status === 'error'
+              ? 'The accounts file has a problem. Fix it, or choose another file on Home.'
+              : editReason
+
+    const submit = (input: AccountInput): Promise<ActionResult> =>
+        dialog?.mode === 'edit'
+            ? run(() => api.updateAccount(dialog.account.slot, dialog.account.email, input))
+            : run(() => api.addAccount(input))
+
+    return (
+        <>
+            <PageCard title="Accounts">
+                {state.status === 'not-set' && (
+                    <Typography align="center" sx={{ py: 2 }}>
+                        {NO_FILE_TEXT}
+                    </Typography>
+                )}
+                {state.status === 'error' && (
+                    <StateBlock
+                        state="error"
+                        message="The accounts file cannot be used."
+                        detail={state.error ?? undefined}
+                        onRetry={reload}
+                    />
+                )}
+                {state.status === 'ok' && state.accounts.length === 0 && (
+                    <StateBlock state="empty" message="The accounts file has no accounts." />
+                )}
+                {state.status === 'ok' && state.accounts.length > 0 && (
+                    <List aria-label="Accounts" disablePadding>
+                        {state.accounts.map((a, i) => (
+                            <Fragment key={a.slot}>
+                                {i > 0 && <Divider component="li" />}
+                                <ListItem
+                                    alignItems="flex-start"
+                                    secondaryAction={
+                                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                            <DisabledReason reason={editReason}>
+                                                <IconButton
+                                                    aria-label={`Edit ${a.email}`}
+                                                    disabled={editReason !== undefined}
+                                                    onClick={() => setDialog({ mode: 'edit', account: a })}
+                                                >
+                                                    <EditOutlinedIcon />
+                                                </IconButton>
+                                            </DisabledReason>
+                                            <DisabledReason reason={editReason}>
+                                                <IconButton
+                                                    aria-label={`Remove ${a.email}`}
+                                                    disabled={editReason !== undefined}
+                                                    onClick={() => setRemoving(a)}
+                                                >
+                                                    <DeleteOutlineIcon />
+                                                </IconButton>
+                                            </DisabledReason>
+                                        </Box>
+                                    }
+                                    sx={{ pr: 14 }}
+                                >
+                                    <ListItemText
+                                        primary={a.email}
+                                        slotProps={{ secondary: { component: 'div' } }}
+                                        secondary={
+                                            <Box
+                                                sx={{
+                                                    display: 'flex',
+                                                    flexWrap: 'wrap',
+                                                    gap: 0.75,
+                                                    pt: 0.75
+                                                }}
+                                            >
+                                                {chips(a).map((c) => (
+                                                    <Chip key={c} label={c} size="small" variant="outlined" />
+                                                ))}
+                                                {a.problems.map((p) => (
+                                                    <Alert key={p} severity="warning" sx={{ width: '100%' }}>
+                                                        {p}
+                                                    </Alert>
+                                                ))}
+                                            </Box>
+                                        }
+                                    />
+                                </ListItem>
+                            </Fragment>
+                        ))}
+                    </List>
+                )}
+                {state.path !== null && (
+                    <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        component="p"
+                        sx={{ pt: 2, wordBreak: 'break-all' }}
+                    >
+                        Accounts file: {state.path}
+                    </Typography>
+                )}
+                {state.status !== 'not-set' && (
+                    <Typography variant="caption" color="text.secondary" component="p">
+                        Last backup:{' '}
+                        {state.lastBackupAt === null
+                            ? 'none yet'
+                            : new Date(state.lastBackupAt).toLocaleString()}
+                    </Typography>
+                )}
+            </PageCard>
+
+            <Box sx={{ position: 'fixed', right: 24, bottom: 24, zIndex: 1050 }}>
+                <DisabledReason reason={addReason}>
+                    <Fab
+                        variant="extended"
+                        color="primary"
+                        disabled={addReason !== undefined}
+                        onClick={() => setDialog({ mode: 'add' })}
+                    >
+                        <AddIcon sx={{ mr: 1 }} />
+                        Add account
+                    </Fab>
+                </DisabledReason>
+            </Box>
+
+            {dialog !== null && (
+                <AccountDialog
+                    key={dialog.mode === 'edit' ? `edit-${String(dialog.account.slot)}` : 'add'}
+                    edit={dialog.mode === 'edit' ? dialog.account : null}
+                    otherEmails={state.accounts
+                        .filter((a) => dialog.mode !== 'edit' || a.slot !== dialog.account.slot)
+                        .map((a) => a.email)}
+                    onSubmit={submit}
+                    onClose={() => setDialog(null)}
+                />
+            )}
+            <ConfirmDialog
+                open={removing !== null}
+                title="Remove account?"
+                message={`Remove ${removing?.email ?? ''} from your accounts file? A backup copy of the file is made first. The saved login session of this account is not deleted.`}
+                confirmLabel="Remove"
+                onConfirm={() => void confirmRemove()}
+                onCancel={() => setRemoving(null)}
+            />
+        </>
+    )
+}

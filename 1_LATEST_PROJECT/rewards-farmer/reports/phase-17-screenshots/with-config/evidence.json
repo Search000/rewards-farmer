@@ -1,0 +1,28 @@
+{
+  "summary": "No channel is on. The engine sends no notifications.",
+  "pageProblem": null,
+  "cards": [
+    {
+      "id": "notify-card-discord",
+      "readiness": "not-set-up"
+    },
+    {
+      "id": "notify-card-ntfy",
+      "readiness": "not-set-up"
+    },
+    {
+      "id": "notify-card-telegram",
+      "readiness": "not-set-up"
+    },
+    {
+      "id": "notify-card-pushplus",
+      "readiness": "not-set-up"
+    }
+  ],
+  "unsupported": [
+    "notify-unsupported-serverchan",
+    "notify-unsupported-clawbot"
+  ],
+  "logFilterNote": "No log filter is switched on in config.json, so the engine sends EVERY log line except debug lines to Discord, ntfy and Telegram while a run is going. That can be many messages, and the lines can contain your account e-mail addresses. This app cannot edit the filter yet.",
+  "consoleProblems": []
+}

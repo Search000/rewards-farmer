@@ -1,0 +1,4 @@
+[submodule "engine"]
+	path = engine
+	url = https://github.com/chiihero/Microsoft-Rewards-Script.git
+	branch = V4-china

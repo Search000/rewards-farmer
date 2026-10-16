@@ -1,0 +1,29 @@
+# dependencies and build output
+node_modules/
+dist/
+out/
+release/
+coverage/
+*.tsbuildinfo
+
+# SECRETS and user data. never commit.
+.env
+.env.*
+!.env.example
+*.env
+!*.example.env
+accounts.env
+sessions/
+logs/
+diagnostics/
+backups/
+userdata/
+config.json
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/

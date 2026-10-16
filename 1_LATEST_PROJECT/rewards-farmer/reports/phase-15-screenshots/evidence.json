@@ -1,0 +1,19 @@
+{
+  "summary": "2 problems, 2 warnings, 4 could not be checked. 9 of 17 checks passed.",
+  "guideButtons": 8,
+  "guideButtonLabels": [
+    "Open guide for Engine config.json",
+    "Open guide for config.json content",
+    "Open guide for Accounts file",
+    "Open guide for Engine process",
+    "Open guide for Engine API answers",
+    "Open guide for Engine reads its config",
+    "Open guide for Engine version",
+    "Open guide for Internet connection"
+  ],
+  "dialog": {
+    "title": "Engine config.json (does not exist)",
+    "text": "Engine config.json (does not exist)\nYou see\nconfig.json does not exist yet.\nWhat to do\n\n1. Open the Home page.\n\n2. Press Create config in the yellow notice. It copies the engine example settings into a new config.json. It never replaces a file that already exists.\n\nWas this seen for real?\n\nOBSERVED HERE: with config.json deleted, the real row and the real engine both reported it missing.\n\nWas the fix tried?\nNot tested: Pressing the button in the real window\nClose"
+  },
+  "consoleProblems": []
+}

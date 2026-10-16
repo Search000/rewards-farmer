@@ -1,0 +1,33 @@
+{
+  "exposedApiKeys": [
+    "getAppInfo",
+    "getFarmerState",
+    "pickAccountsFile",
+    "startRun",
+    "stopRun",
+    "createEngineConfig",
+    "restartEngine",
+    "setTimer",
+    "onFarmerState",
+    "getAccountsState",
+    "addAccount",
+    "updateAccount",
+    "removeAccount",
+    "getEngineSettingsState",
+    "saveEngineSettings",
+    "resetEngineSettings",
+    "getSecretsState",
+    "setSecret",
+    "clearSecret",
+    "getLogsState",
+    "refreshLogs",
+    "exportLogs",
+    "getSettings",
+    "setThemeMode",
+    "setShutdownAfterRun"
+  ],
+  "logsHeading": "Logs",
+  "logsBodyText": "Logs\nEngine status\n\nReported by the engine\n\nEngine\n\nNot started\n\nEngine version\n\nUnknown\n\nRun\n\nUnknown (engine not reachable)\n\nRun started\n\n-\n\nLast exit\n\n-\n\nCurrent account\n\nUnknown\n\nCurrent points\n\nUnknown\n\nLog stream\n\nEngine not running\n\nLevel\nAll levels\nLevel\nSearch\nSearch\nFollow newest\nRefresh\nCopy\nExport\nThe engine is not running, so there are no logs to show.",
+  "secretsHeading": "Secrets & API keys",
+  "consoleProblems": []
+}

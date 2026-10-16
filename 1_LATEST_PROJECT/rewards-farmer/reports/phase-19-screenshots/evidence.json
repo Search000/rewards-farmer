@@ -1,0 +1,24 @@
+{
+  "emptySummary": "There is no backup yet.",
+  "clickedCreate": true,
+  "createResult": "Backup created\n\nBackup backup-20261015-062710-223 created and checked: 3 file(s), 3.9 KB, every checksum matches.",
+  "summaryAfterCreate": "1 backup. Every one passed the check just now.",
+  "statuses": [
+    "Checked: OK"
+  ],
+  "clickedInspect": true,
+  "detailCheck": "Checked: OK\n\nAll 3 file(s) are present and every size and SHA-256 checksum matches the manifest. Checked Oct 15, 2026, 6:27:14 AM.",
+  "detailFiles": [
+    "Engine settings (config.json)\n\nengine-config.json, 3.5 KB, SHA-256 6cdabf4075f7…\n\nHolds secrets",
+    "Accounts file\n\naccounts.env, 148 bytes, SHA-256 01fd768e1108…\n\nHolds secrets",
+    "App settings\n\napp-settings.json, 164 bytes, SHA-256 5f0b7b305017…"
+  ],
+  "backupFolders": 1,
+  "clickedCheckAgain": true,
+  "summaryAfterDamage": "1 backup. 1 failed the check and must not be used.",
+  "statusesAfterDamage": [
+    "Damaged: do not use"
+  ],
+  "damagedDetail": "Damaged: do not use\n\nThis backup is not what it was when it was made. Do not use it to restore.\n\n• Accounts file (accounts.env) is missing from the backup.",
+  "consoleProblems": []
+}

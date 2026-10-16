@@ -1,0 +1,13 @@
+{
+  "summary": "3 problems, 2 warnings, 4 could not be checked. 8 of 17 checks passed.",
+  "card": {
+    "heading": "Diagnostics bundle",
+    "text": "Diagnostics bundle | Saves one ZIP file that you can send to a person who helps you with a problem. It holds the versions, your engine settings with every secret hidden, the results of the checks above and the newest lines of the app, engine and error logs. Passwords, tokens, cookies, sessions, e-mail addresses and IP addresses are not in it, and the app refuses to save the file if its safety check finds anything secret. You choose where it is saved. | Export diagnostics",
+    "button": {
+      "text": "Export diagnostics",
+      "disabled": false
+    }
+  },
+  "resultBefore": null,
+  "consoleProblems": []
+}
